@@ -1,0 +1,8 @@
+controller:
+  MODE: video_render
+  OUTPUT_VIDEO_PATH: /Users/jisunghan/metaDrawingtest/AnimatedDrawings/outputs/45115a9a-1c18-4399-9acb-4632238015f7/video.gif
+scene:
+  ANIMATED_CHARACTERS:
+  - character_cfg: /Users/jisunghan/metaDrawingtest/AnimatedDrawings/outputs/45115a9a-1c18-4399-9acb-4632238015f7/char_cfg.yaml
+    motion_cfg: /Users/jisunghan/metaDrawingtest/AnimatedDrawings/examples/config/motion/dab.yaml
+    retarget_cfg: /Users/jisunghan/metaDrawingtest/AnimatedDrawings/examples/config/retarget/fair1_ppf.yaml

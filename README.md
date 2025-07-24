@@ -280,6 +280,111 @@ render.start('./examples/config/mvc/four_legs_example.yaml')
 ### Creating Your Own Config Files
 If you want to create your own config files, see the [configuration file documentation](examples/config/README.md).
 
+## Web Application Setup
+
+This project also includes a complete web application that allows users to draw stick figures in a browser and generate animations using AI. The web app consists of three components:
+
+### Architecture Overview
+```
+Frontend (HTML + Vue.js) → Flask API Server → TorchServe ML Server → AnimatedDrawings
+```
+
+### Running the Web Application
+
+#### Prerequisites
+- Python 3.8.13 (virtual environment required)
+- Java 11+ (for TorchServe)
+- Modern web browser
+
+#### Step 1: Setup Virtual Environment
+```bash
+# Create and activate virtual environment
+conda create --name animated_drawings python=3.8.13
+conda activate animated_drawings
+
+# Install core dependencies
+pip install -e .
+
+# Install additional web dependencies
+pip install flask-cors==4.0.0 imageio==2.31.3
+```
+
+#### Step 2: ML Server Setup
+
+**Option A: Use External TorchServe (Quick & Easy)**
+```bash
+# No setup required! The app uses an external ML server at 15.157.188.112:8080
+# Just proceed to Step 3
+```
+
+**Option B: Setup Local TorchServe (Complete Local Environment)**
+```bash
+# Navigate to torchserve directory
+cd torchserve
+
+# Install Java if needed (macOS)
+brew install java
+sudo ln -sfn /opt/homebrew/opt/openjdk/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk.jdk
+
+# Setup ML dependencies
+git clone https://github.com/jin-s13/xtcocoapi.git
+cd xtcocoapi && pip install -r requirements.txt && python setup.py install && cd ..
+pip install -U openmim torch==1.13.0 torchserve mmdet==2.27.0 mmpose==0.29.0
+mim install mmcv-full==1.7.0
+
+# Download pre-trained models
+mkdir -p ./model-store
+wget https://github.com/facebookresearch/AnimatedDrawings/releases/download/v0.0.1/drawn_humanoid_detector.mar -P ./model-store/
+wget https://github.com/facebookresearch/AnimatedDrawings/releases/download/v0.0.1/drawn_humanoid_pose_estimator.mar -P ./model-store/
+
+# Start TorchServe (Terminal 1)
+torchserve --start --ts-config config.local.properties --foreground
+
+# Update server address in examples/image_to_annotations.py:
+# Change "http://15.157.188.112:8080" to "http://localhost:8080"
+```
+
+#### Step 3: Start Flask API Server (Terminal 2) 
+```bash
+# Activate virtual environment
+conda activate animated_drawings
+
+# Set Python path
+export PYTHONPATH="/path/to/your/AnimatedDrawings:$PYTHONPATH"
+
+# Start Flask API server
+python animation_api.py
+```
+
+#### Step 4: Start Frontend (Terminal 3)
+```bash
+# Start simple HTTP server (no virtual environment needed)
+python -m http.server 3000
+```
+
+#### Step 5: Access the Web Application
+Open your browser and navigate to: `http://localhost:3000`
+
+### Web Application Features
+- **Drawing Canvas**: Draw stick figures directly in the browser
+- **File Upload**: Upload existing drawings (PNG, JPG, GIF)
+- **Multiple Animations**: Choose from 5 different motion types (dab, jumping, wave, zombie, dance)
+- **Real-time Processing**: AI-powered character detection and pose estimation
+- **Export Options**: Download animations as GIF files
+- **Responsive Design**: Works on desktop and mobile devices
+
+### API Endpoints
+- `POST /api/animate` - Generate animation from image
+- `GET /api/health` - Check server status
+- `GET /api/motions` - List available motions
+- `GET /api/download/<id>/<filename>` - Download generated files
+
+### Troubleshooting
+- **Port conflicts**: Change ports in respective config files
+- **TorchServe issues**: Check Java installation and model files
+- **Python path errors**: Ensure PYTHONPATH includes project root
+- **Memory issues**: Increase Docker memory allocation if using containers
+
 ## Browser-Based Demo
 
 If you'd like to animate a drawing of your own, but don't want to deal with downloading code and using the command line, check out our browser-based demo:

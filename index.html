@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 Stickman Animator</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // StickmanAnimator component definition
+        const StickmanAnimator = {
+            template: `
+                <div class="stickman-animator">
+                    <div class="container">
+                        <h1>🎨 Stickman Drawing → Animation Generator</h1>
+                        
+                        <!-- Mode Selection -->
+                        <div class="mode-selection" v-if="!isProcessing && !animationResult">
+                            <div class="mode-tabs">
+                                <button 
+                                    @click="currentMode = 'draw'" 
+                                    :class="['mode-tab', { active: currentMode === 'draw' }]"
+                                >
+                                    ✏️ Draw
+                                </button>
+                                <button 
+                                    @click="currentMode = 'upload'" 
+                                    :class="['mode-tab', { active: currentMode === 'upload' }]"
+                                >
+                                    📁 Upload
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Drawing section -->
+                        <div class="drawing-section" v-if="!isProcessing && !animationResult && currentMode === 'draw'">
+                            <h2>Draw your stickman!</h2>
+                            <div class="canvas-container">
+                                <canvas 
+                                    ref="drawingCanvas"
+                                    :width="canvasWidth" 
+                                    :height="canvasHeight"
+                                    @mousedown="startDrawing"
+                                    @mousemove="draw"
+                                    @mouseup="stopDrawing"
+                                    @mouseleave="stopDrawing"
+                                    class="drawing-canvas"
+                                ></canvas>
+                            </div>
+                            
+                            <div class="controls">
+                                <button @click="clearCanvas" class="btn btn-secondary">🗑️ Clear</button>
+                                <button @click="createAnimation" class="btn btn-primary" :disabled="!hasDrawing">
+                                    ✨ Create Animation
+                                </button>
+                            </div>
+                            
+                            <div class="drawing-tips">
+                                <p>💡 Tip: Make sure to draw head, body, arms, and legs distinctly!</p>
+                            </div>
+                        </div>
+
+                        <!-- Upload section -->
+                        <div class="upload-section" v-if="!isProcessing && !animationResult && currentMode === 'upload'">
+                            <h2>Upload your drawing!</h2>
+                            
+                            <div class="upload-container">
+                                <div class="upload-area" @click="triggerFileInput" @dragover.prevent @drop.prevent="handleDrop">
+                                    <input 
+                                        type="file" 
+                                        ref="fileInput" 
+                                        accept="image/*" 
+                                        @change="handleFileSelect"
+                                        style="display: none"
+                                    >
+                                    <div v-if="!uploadedImage" class="upload-placeholder">
+                                        <div class="upload-icon">📁</div>
+                                        <p>Click to upload or drag & drop an image</p>
+                                        <p class="upload-hint">Supports PNG, JPG, GIF files</p>
+                                    </div>
+                                    <div v-else class="uploaded-image">
+                                        <img :src="uploadedImage" alt="Uploaded drawing" class="preview-image">
+                                        <button @click.stop="clearUpload" class="btn btn-secondary btn-small">❌ Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="controls">
+                                <button @click="createAnimation" class="btn btn-primary" :disabled="!uploadedImage">
+                                    ✨ Create Animation
+                                </button>
+                            </div>
+                            
+                            <div class="upload-tips">
+                                <p>💡 Tip: Works best with clear drawings of stick figures or simple characters!</p>
+                            </div>
+                        </div>
+
+                        <!-- Processing screen -->
+                        <div class="processing-section" v-if="isProcessing">
+                            <div class="loading-container">
+                                <div class="spinner"></div>
+                                <h2>🤖 AI is generating animation...</h2>
+                                <p>{{ processingMessage }}</p>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Animation result screen -->
+                        <div class="result-section" v-if="animationResult && !isProcessing">
+                            <h2>🎉 Animation Complete!</h2>
+                            
+                            <div class="animation-player">
+                                <div class="video-container">
+                                    <img 
+                                        ref="animationPlayer"
+                                        :src="animationResult.video_url" 
+                                        alt="Generated animation"
+                                        class="animation-video"
+                                    />
+                                </div>
+                                
+                                <div class="player-controls">
+                                    <button @click="togglePlay" class="btn btn-play">
+                                        {{ isPlaying ? '⏸️ Pause' : '▶️ Play' }}
+                                    </button>
+                                    <button @click="restartAnimation" class="btn btn-secondary">
+                                        🔄 Restart
+                                    </button>
+                                    <button @click="downloadAnimation" class="btn btn-success">
+                                        💾 Download
+                                    </button>
+                                </div>
+                                
+                                <div class="animation-info">
+                                    <p>📊 Processing time: {{ animationResult.processing_time }} seconds</p>
+                                    <p>🎬 Frame count: {{ animationResult.frame_count }} frames</p>
+                                </div>
+                            </div>
+
+                            <div class="restart-section">
+                                <button @click="resetApp" class="btn btn-outline">
+                                    🎨 Create New
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `,
+            
+            data() {
+                return {
+                    // Current mode
+                    currentMode: 'draw', // 'draw' or 'upload'
+                    
+                    // Canvas settings
+                    canvasWidth: 600,
+                    canvasHeight: 400,
+                    isDrawing: false,
+                    hasDrawing: false,
+                    
+                    // Upload settings
+                    uploadedImage: null,
+                    
+                    // Processing state
+                    isProcessing: false,
+                    processingMessage: 'Preparing AI model...',
+                    progress: 0,
+                    
+                    // Animation result
+                    animationResult: null,
+                    isPlaying: false,
+                    
+                    // Drawing settings
+                    strokeStyle: '#2c3e50',
+                    lineWidth: 3
+                }
+            },
+            
+            mounted() {
+                this.initCanvas();
+            },
+            
+            methods: {
+                // Initialize canvas
+                initCanvas() {
+                    const canvas = this.$refs.drawingCanvas;
+                    if (!canvas) return;
+                    
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set canvas style
+                    ctx.strokeStyle = this.strokeStyle;
+                    ctx.lineWidth = this.lineWidth;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    
+                    // Set white background
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                },
+                
+                // Start drawing
+                startDrawing(event) {
+                    this.isDrawing = true;
+                    const canvas = this.$refs.drawingCanvas;
+                    const ctx = canvas.getContext('2d');
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        event.clientX - rect.left, 
+                        event.clientY - rect.top
+                    );
+                },
+                
+                // Draw
+                draw(event) {
+                    if (!this.isDrawing) return;
+                    
+                    const canvas = this.$refs.drawingCanvas;
+                    const ctx = canvas.getContext('2d');
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    ctx.lineTo(
+                        event.clientX - rect.left, 
+                        event.clientY - rect.top
+                    );
+                    ctx.stroke();
+                    
+                    this.hasDrawing = true;
+                },
+                
+                // Stop drawing
+                stopDrawing() {
+                    this.isDrawing = false;
+                },
+                
+                // Clear canvas
+                clearCanvas() {
+                    const canvas = this.$refs.drawingCanvas;
+                    if (!canvas) return;
+                    
+                    const ctx = canvas.getContext('2d');
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                    
+                    this.hasDrawing = false;
+                },
+                
+                // File upload methods
+                triggerFileInput() {
+                    this.$refs.fileInput.click();
+                },
+                
+                handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.processFile(file);
+                    }
+                },
+                
+                handleDrop(event) {
+                    const file = event.dataTransfer.files[0];
+                    if (file) {
+                        this.processFile(file);
+                    }
+                },
+                
+                processFile(file) {
+                    if (!file.type.startsWith('image/')) {
+                        alert('Please upload an image file');
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.uploadedImage = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+                
+                clearUpload() {
+                    this.uploadedImage = null;
+                    this.$refs.fileInput.value = '';
+                },
+                
+                // Create animation
+                async createAnimation() {
+                    this.isProcessing = true;
+                    this.progress = 0;
+                    
+                    try {
+                        let imageData;
+                        
+                        if (this.currentMode === 'draw') {
+                            // Step 1: Convert canvas to image
+                            this.processingMessage = 'Converting drawing to image...';
+                            const canvas = this.$refs.drawingCanvas;
+                            imageData = canvas.toDataURL('image/png');
+                        } else {
+                            // Use uploaded image
+                            this.processingMessage = 'Processing uploaded image...';
+                            imageData = this.uploadedImage;
+                        }
+                        
+                        this.progress = 20;
+                        
+                        // Step 2: Call backend API
+                        this.processingMessage = 'AI model analyzing character...';
+                        
+                        const response = await fetch('http://localhost:5000/api/animate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                image: imageData,
+                                motion: 'dab', // Default motion
+                                output_format: 'gif'
+                            })
+                        });
+                        
+                        this.progress = 60;
+                        this.processingMessage = 'Generating 3D animation...';
+                        
+                        if (!response.ok) {
+                            throw new Error('Animation generation failed');
+                        }
+                        
+                        const result = await response.json();
+                        
+                        this.progress = 100;
+                        this.processingMessage = 'Complete!';
+                        
+                        // Save result
+                        this.animationResult = result;
+                        
+                    } catch (error) {
+                        console.error('Animation generation error:', error);
+                        alert('Animation generation failed: ' + error.message);
+                    } finally {
+                        this.isProcessing = false;
+                    }
+                },
+                
+                // Animation play/pause
+                togglePlay() {
+                    const img = this.$refs.animationPlayer;
+                    
+                    if (this.isPlaying) {
+                        // Pause GIF (stop at current frame)
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        img.src = canvas.toDataURL();
+                        this.isPlaying = false;
+                    } else {
+                        // Play GIF (restore original URL)
+                        img.src = this.animationResult.video_url + '?t=' + Date.now();
+                        this.isPlaying = true;
+                    }
+                },
+                
+                // Restart animation
+                restartAnimation() {
+                    const img = this.$refs.animationPlayer;
+                    img.src = this.animationResult.video_url + '?t=' + Date.now();
+                    this.isPlaying = true;
+                },
+                
+                // Download animation
+                downloadAnimation() {
+                    const link = document.createElement('a');
+                    link.href = this.animationResult.video_url;
+                    link.download = 'stickman_animation.gif';
+                    link.click();
+                },
+                
+                // Reset app (new drawing)
+                resetApp() {
+                    this.animationResult = null;
+                    this.isPlaying = false;
+                    this.currentMode = 'draw';
+                    this.uploadedImage = null;
+                    this.clearCanvas();
+                }
+            }
+        };
+
+        // Create Vue app
+        const { createApp } = Vue;
+        
+        createApp({
+            components: {
+                StickmanAnimator
+            },
+            template: `
+                <div id="app">
+                    <StickmanAnimator />
+                </div>
+            `
+        }).mount('#app');
+    </script>
+
+    <style>
+        .stickman-animator {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-top: 20px;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-bottom: 20px;
+        }
+
+        /* Mode selection */
+        .mode-selection {
+            margin-bottom: 30px;
+        }
+
+        .mode-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-tab {
+            padding: 12px 24px;
+            border: 2px solid #3498db;
+            background: transparent;
+            color: #3498db;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .mode-tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .mode-tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Drawing section */
+        .drawing-section {
+            margin-bottom: 30px;
+        }
+
+        .canvas-container {
+            display: inline-block;
+            border: 3px solid #3498db;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .drawing-canvas {
+            display: block;
+            cursor: crosshair;
+            background: white;
+        }
+
+        /* Upload section */
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-container {
+            margin-bottom: 20px;
+        }
+
+        .upload-area {
+            border: 3px dashed #3498db;
+            border-radius: 10px;
+            padding: 40px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #2980b9;
+            background: #e3f2fd;
+        }
+
+        .upload-placeholder {
+            text-align: center;
+            color: #7f8c8d;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: #95a5a6;
+        }
+
+        .uploaded-image {
+            text-align: center;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+        }
+
+        .drawing-tips, .upload-tips {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        /* Button styles */
+        .btn {
+            padding: 12px 24px;
+            margin: 0 8px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            color: white;
+        }
+
+        .btn-play {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            font-size: 18px;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #3498db;
+            color: #3498db;
+        }
+
+        .btn-outline:hover {
+            background: #3498db;
+            color: white;
+        }
+
+        /* Processing screen */
+        .processing-section {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading-container h2 {
+            color: #3498db;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #ecf0f1;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #ecf0f1;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #3498db, #2ecc71);
+            transition: width 0.3s ease;
+        }
+
+        /* Result screen */
+        .result-section {
+            text-align: center;
+        }
+
+        .animation-player {
+            margin-bottom: 30px;
+        }
+
+        .video-container {
+            display: inline-block;
+            border: 3px solid #27ae60;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .animation-video {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            background: white;
+        }
+
+        .player-controls {
+            margin-bottom: 20px;
+        }
+
+        .animation-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #495057;
+        }
+
+        .animation-info p {
+            margin: 5px 0;
+        }
+
+        .restart-section {
+            border-top: 2px solid #ecf0f1;
+            padding-top: 20px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .stickman-animator {
+                padding: 10px;
+                margin-top: 10px;
+            }
+            
+            .drawing-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+            
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                margin: 5px;
+            }
+            
+            .mode-tabs {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</body>
+</html> 
