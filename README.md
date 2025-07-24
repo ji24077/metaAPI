@@ -1,8 +1,6 @@
 
 # 🎨 AnimatedDrawings Web Application
 
-![Demo Animation](https://user-images.githubusercontent.com/6675724/219223438-2c93f9cb-d4b5-45e9-a433-149ed76affa6.gif)
-
 A web-based application that allows users to draw stick figures in their browser and have AI convert them into animated GIFs. Built with Vue.js frontend, Flask API backend, and powered by Meta's AnimatedDrawings AI models.
 
 ## ✨ Features
