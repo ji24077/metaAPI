@@ -231,8 +231,9 @@ python -m http.server 8080
 ## 📄 License
 
 This project is based on Meta's AnimatedDrawings research:
-- Original paper: [A Method for Animating Children's Drawings of the Human Figure](https://dl.acm.org/doi/10.1145/3592788)
-- Original repository: [facebookresearch/AnimatedDrawings](https://github.com/facebookresearch/AnimatedDrawings)
+- **Original Paper**: [A Method for Animating Children's Drawings of the Human Figure](https://dl.acm.org/doi/10.1145/3592788)
+- **Original Repository**: [facebookresearch/AnimatedDrawings](https://github.com/facebookresearch/AnimatedDrawings)
+- **Project Website**: [fairanimateddrawings.com](http://www.fairanimateddrawings.com)
 
 Licensed under the MIT License. See [LICENSE](LICENSE) file for details.
 
@@ -261,6 +262,23 @@ This project is made possible thanks to the incredible **open source community**
 By making their research freely available, Meta has democratized access to advanced AI animation technology, allowing developers, artists, and enthusiasts to create magical experiences from simple drawings. This project stands as a testament to the power of open source collaboration and the positive impact of sharing knowledge for the benefit of all.
 
 **Thank you to everyone who contributes to making AI research accessible and open!** 🙏
+
+---
+
+## 🔗 Original Source
+
+This web application is built upon Meta's groundbreaking AnimatedDrawings research. To explore the original implementation, research papers, and additional examples:
+
+**🏠 Visit the Original Repository:**  
+[https://github.com/facebookresearch/AnimatedDrawings](https://github.com/facebookresearch/AnimatedDrawings)
+
+The original repository contains:
+- Complete research implementation
+- Advanced configuration options
+- Additional motion files and character examples
+- Docker setup for local TorchServe
+- Comprehensive documentation and research insights
+- Direct command-line tools for batch processing
 
 ---
 
